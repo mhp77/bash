@@ -1,0 +1,90 @@
+#!/bin/bash
+##---------------------------------------------------------------------------------------------------------------------------##
+###############################################################################################################################
+##---------------------------------------------------------------------------------------------------------------------------##
+##
+## Abstract:
+##   Shell script ls_packages: List software packages matching selected search patterns.
+##
+## Details:
+##   None.
+##
+## References:
+## - bash(1) man page
+##   --> $ man bash
+## - Advanced Bash-Scripting Guide
+##   --> http://www.tldp.org/LDP/abs/abs-guide.pdf
+## - aptitude user’s manual
+##   --> http://algebraicthunk.net/~dburrows/projects/aptitude/doc/en/index.html
+##
+## Author:
+##   Michael H. Pock || MHP || mhp77@gmx.at
+##
+## © Copyleft 2016 MHP
+##
+##---------------------------------------------------------------------------------------------------------------------------##
+###############################################################################################################################
+##---------------------------------------------------------------------------------------------------------------------------##
+
+. ~/.bash_common || exit
+
+set +o pipefail
+
+##---------------------------------------------------------------------------------------------------------------------------##
+
+headings_and_patterns=\
+(
+  'New packages:'
+  '?new ?architecture(native)'
+  'Broken packages:'
+  '?broken'
+  'Packages that have been removed but not purged:'
+  '?config-files'
+  'Automatically installed packages that are not required by any manually installed package:'
+  '?garbage'
+  'Installed packages that are orphaned and possibly useless:'
+  '?orphaned'
+  'Installed packages that are transitional:'
+  '?narrow(?installed, ?term(transitional))'
+  'Installed packages that are not available in any version from any archive and thus might be obsolete:'
+  '?obsolete'
+  'Installed packages that are not available from the Debian Testing archive:'
+  '?narrow(?installed, !(?origin(debian) ?archive(testing)))'
+  'Experimental Linux kernels:'
+  '?archive(experimental) ?architecture(native) linux-image'
+)
+
+aptitude_options=(--display-format='%c%a%M|%p|%v|%V|%t' --disable-columns)
+
+deborphan_options=(--priority=required --all-packages --no-show-section)
+
+column_options=(-t -s \|)
+
+##---------------------------------------------------------------------------------------------------------------------------##
+
+function display_help_message {
+  echo "${0}: usage: ${0##*/}" >&2
+  exit ${stat_incorrect_usage}
+}
+
+##---------------------------------------------------------------------------------------------------------------------------##
+
+[ ${#} -gt 0 ] && display_help_message
+
+##---------------------------------------------------------------------------------------------------------------------------##
+
+for ((i=0, imax=${#headings_and_patterns[*]}-1; i<imax; ++i)); do
+  heading=${headings_and_patterns[i]}
+  pattern=${headings_and_patterns[++i]}
+  echo -e "\n${heading}"
+  if [ "${pattern}" == '?orphaned' ]; then
+    deborphan "${deborphan_options[@]}" | sort | sed -r 's/([^:]+)(:[^:]+)?/"?exact-name(\1)"/' | xargs -r                      \
+      aptitude search "${aptitude_options[@]}"
+  else
+    aptitude search "${aptitude_options[@]}" "${pattern}"
+  fi | column "${column_options[@]}"
+done
+
+echo ''
+
+##---------------------------------------------------------------------------------------------------------------------------##

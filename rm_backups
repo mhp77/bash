@@ -1,0 +1,82 @@
+#!/bin/bash
+##---------------------------------------------------------------------------------------------------------------------------##
+###############################################################################################################################
+##---------------------------------------------------------------------------------------------------------------------------##
+##
+## Abstract:
+##   Shell script rm_backups: Remove all regular files with suffix BACKUP_SUFFIX below DIRECTORY.
+##
+## Details:
+## - Below DIRECTORY, rm_backups does not follow symbolic links, nor does it descend into directories on other file systems.
+## - If BACKUP_SUFFIX is the empty string rm_backups removes every regular file below DIRECTORY.
+## - rm_backups does not remove files with base names BACKUP_SUFFIX and .BACKUP_SUFFIX.
+##
+## References:
+## - bash(1) man page
+##   --> $ man bash
+## - Advanced Bash-Scripting Guide
+##   --> http://www.tldp.org/LDP/abs/abs-guide.pdf
+##
+## Author:
+##   Michael H. Pock || MHP || mhp77@gmx.at
+##
+## © Copyleft 2016 MHP
+##
+##---------------------------------------------------------------------------------------------------------------------------##
+###############################################################################################################################
+##---------------------------------------------------------------------------------------------------------------------------##
+
+. ~/.bash_common || exit
+
+##---------------------------------------------------------------------------------------------------------------------------##
+
+directory=.
+
+backup_suffix=\~
+
+##---------------------------------------------------------------------------------------------------------------------------##
+
+function display_help_message {
+  echo "${0}: usage: ${0##*/} [ -d DIRECTORY ] [ -b BACKUP_SUFFIX ]" >&2
+  exit ${stat_incorrect_usage}
+}
+
+##---------------------------------------------------------------------------------------------------------------------------##
+
+while getopts :d:b: OPT; do
+  case "${OPT}" in
+    d)
+      directory=${OPTARG}
+      ;;
+    b)
+      backup_suffix=${OPTARG}
+      ;;
+    *)
+      display_help_message
+  esac
+done
+shift $((OPTIND-1))
+OPTIND=1
+
+[ ${#} -gt 0 ] && display_help_message
+
+##---------------------------------------------------------------------------------------------------------------------------##
+
+filename_to_dirname directory
+
+backup_suffix=${backup_suffix//\\/\\\\}
+backup_suffix=${backup_suffix//\*/\\\*}
+backup_suffix=${backup_suffix//\?/\\\?}
+backup_suffix=${backup_suffix//\[/\\\[}
+
+##---------------------------------------------------------------------------------------------------------------------------##
+
+if [ -z "${backup_suffix}" ]; then
+  ! read -e -p "Do you really want to remove all regular files below \`${directory}'? [y/N] "
+  [[ "${REPLY:-N}" != [yY] ]] && exit ${stat_user_interruption}
+fi
+
+echo 'Removing ...'
+find "${directory}" -xdev -type f -name "?*${backup_suffix}" \! -name ".${backup_suffix}" -delete -print
+
+##---------------------------------------------------------------------------------------------------------------------------##
